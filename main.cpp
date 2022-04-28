@@ -4,52 +4,44 @@
  */
 
 #include "mbed.h"
-
+#include "DebounceIn.h"
+#include "Mcp4xxx.h"
 
 
 // Blinking rate in milliseconds
-#define BLINKING_RATE     5ms
-
-#define WRITE_CMD 0x00
-#define READ_CMD  0x0C
-#define INCR_CMD  0x04
-#define DECR_CMD  0x08
-
-void set_ohm(SPI& spi, DigitalOut cs, uint16_t tap) {
-    cs = 0;
-
-    ThisThread::sleep_for(1ms);
-
-    char data[2] {};
-    data[0] = 0x00 | WRITE_CMD;
-    data[1] = tap & 0xFF;
-
-    char read[2] {};
-    read[0] = spi.write(data[0]);
-    read[1] = spi.write(data[1]);
-    //spi.write(data, sizeof(data), read, sizeof(read));
-
-    //printf("wrote: 0x%02x%02x\tread: 0x%02x%02x\r\n", data[0], data[1], read[0], read[1]);
-
-    cs = 1;
-}
-
+#define BLINKING_RATE     200ms
 
 int main()
 {
     printf("test\r\n");
     // Initialise the digital pin LED1 as an output
     DigitalOut led(LED1);
-    SPI distortion(p5, p6, p7);
-    DigitalOut cs(p20);
-    distortion.format(8, 1);
-    distortion.frequency(1e6);
+    DigitalOut upLed(LED2);
+    DigitalOut downLed(LED3);
+    DebounceIn up(p21);
+    DebounceIn down(p22);
+    Mcp4xxx distortion(p5, p6, p7, p20);
 
-    uint8_t data = 0;
+    static uint16_t steps[] = {
+        0, 1, 2, 4, 8, 16, 32, 64, 128, 256
+    };
+
+    size_t idx = 0;
     while (true) {
-        //led = !led;
-        set_ohm(distortion, cs, data);
-        data++;
+        if (up && idx < (sizeof(steps) / sizeof(steps[0]) - 1)) {
+            idx++;
+            upLed = !upLed;
+        }
+
+        if (down && idx > 0) {
+            idx--;
+            downLed = !downLed;
+        }
+
+        printf("setting 0x%04x\r\n", steps[idx]);
+        distortion.set_wiper_tap(0, steps[idx]);
+
+        led = !led;
         
         ThisThread::sleep_for(BLINKING_RATE);
     }

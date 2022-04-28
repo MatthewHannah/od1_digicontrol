@@ -5,3 +5,5 @@ projectfiles
 *.o
 *.d
 BUILD/
+BUILD
+
